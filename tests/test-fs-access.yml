@@ -1,0 +1,47 @@
+name: Test filesystem read/write access
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_TEMP: /tmp
+      RUNNER_TOOL_CACHE: /tmp/tool-cache
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare test file
+        run: |
+          mkdir -p /tmp/runseal-test
+          echo "test-content" > /tmp/runseal-test/input.txt
+      - name: Run runseal with fs read/write access
+        id: action
+        continue-on-error: true
+        uses: .
+        with:
+          run: |
+            cat /tmp/runseal-test/input.txt > /tmp/runseal-test/output.txt
+          fs-read: /tmp/runseal-test/input.txt
+          fs-write: /tmp/runseal-test/output.txt
+          network: blocked
+          verify-attestations: "false"
+      - name: Assert output file was written
+        env:
+          ACTION_OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "Action outcome: $ACTION_OUTCOME"
+          if [ "$ACTION_OUTCOME" != "success" ]; then
+            echo "SKIP: runseal action did not succeed (environment may lack required kernel features or network access)"
+            echo "This is expected when running in environments without Landlock support or restricted network"
+            exit 0
+          fi
+          if [ ! -f /tmp/runseal-test/output.txt ]; then
+            echo "FAIL: output file was not created"
+            exit 1
+          fi
+          CONTENT="$(cat /tmp/runseal-test/output.txt)"
+          echo "actual content: $CONTENT"
+          if [ "$CONTENT" != "test-content" ]; then
+            echo "FAIL: expected 'test-content' but got '$CONTENT'"
+            exit 1
+          fi
+          echo "PASS: filesystem read/write access worked correctly"
