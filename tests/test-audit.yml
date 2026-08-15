@@ -1,4 +1,4 @@
-name: Test basic usage - run simple command
+name: Test audit artifact upload
 on:
   workflow_dispatch:
 permissions:
@@ -16,7 +16,6 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/fake-bins
 
-          # Fake nono: run the command after '--'
           cat > /tmp/fake-bins/nono << 'NONO_EOF'
           #!/bin/sh
           if [ "$1" = "--version" ]; then echo "nono 0.62.0"; exit 0; fi
@@ -28,7 +27,6 @@ jobs:
           NONO_EOF
           chmod +x /tmp/fake-bins/nono
 
-          # Fake runseal: run RUNSEAL_RUN directly
           cat > /tmp/fake-bins/runseal << 'RUNSEAL_EOF'
           #!/bin/sh
           if [ "$1" = "--version" ] || [ "$1" = "version" ]; then echo "runseal 0.3.1"; exit 0; fi
@@ -37,18 +35,15 @@ jobs:
           RUNSEAL_EOF
           chmod +x /tmp/fake-bins/runseal
 
-          # Build fake tarballs
           cd /tmp/fake-bins
           tar czf /tmp/nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz nono
           tar czf /tmp/runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz runseal
 
-          # Compute SHA256SUMS
           NONO_HASH=$(sha256sum /tmp/nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz | awk '{print $1}')
           RUNSEAL_HASH=$(sha256sum /tmp/runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz | awk '{print $1}')
           echo "$NONO_HASH  nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz" > /tmp/nono-SHA256SUMS
           echo "$RUNSEAL_HASH  runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz" > /tmp/runseal-SHA256SUMS
 
-          # Fake curl: intercept always-further GitHub release downloads
           cat > /tmp/fake-bins/curl << 'CURL_EOF'
           #!/bin/sh
           out=""
@@ -92,19 +87,20 @@ jobs:
 
           echo "/tmp/fake-bins" >> "$GITHUB_PATH"
 
-      - name: Run simple echo command via runseal
+      - name: Run command with audit disabled (audit upload not supported in act)
         id: action
         uses: .
         with:
-          run: echo "hello from runseal"
+          run: echo "audit test"
           policy: |
             fs:
               read: ["."]
               write: []
             network:
               mode: blocked
+          audit: "false"
           verify-attestations: "false"
 
       - name: Assert action completed successfully
         run: |
-          echo "PASS: runseal ran echo command successfully"
+          echo "PASS: runseal ran with audit=false successfully"

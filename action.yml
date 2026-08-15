@@ -62,7 +62,7 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Setup Runseal
       shell: bash
-      run: bash "$GITHUB_ACTION_PATH/setup.sh"
+      run: bash "$RUNSEAL_ACTION_PATH/setup.sh"
       env:
         RUNSEAL_VERSION: ${{ inputs.runseal-version }}
         NONO_VERSION: ${{ inputs.nono-version }}

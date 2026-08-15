@@ -1,33 +1,105 @@
-name: Test inline policy YAML
+name: Test custom policy YAML
 on:
   workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+  attestations: read
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      RUNNER_TEMP: /tmp
-      RUNNER_TOOL_CACHE: /tmp/tool-cache
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Run runseal with inline policy
+
+      - name: Install fake nono and runseal via mock curl
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fake-bins
+
+          cat > /tmp/fake-bins/nono << 'NONO_EOF'
+          #!/bin/sh
+          if [ "$1" = "--version" ]; then echo "nono 0.62.0"; exit 0; fi
+          while [ "$#" -gt 0 ]; do
+            if [ "$1" = "--" ]; then shift; exec "$@"; fi
+            shift
+          done
+          exit 1
+          NONO_EOF
+          chmod +x /tmp/fake-bins/nono
+
+          cat > /tmp/fake-bins/runseal << 'RUNSEAL_EOF'
+          #!/bin/sh
+          if [ "$1" = "--version" ] || [ "$1" = "version" ]; then echo "runseal 0.3.1"; exit 0; fi
+          if [ "$1" = "run" ]; then exec bash -c "$RUNSEAL_RUN"; fi
+          exit 1
+          RUNSEAL_EOF
+          chmod +x /tmp/fake-bins/runseal
+
+          cd /tmp/fake-bins
+          tar czf /tmp/nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz nono
+          tar czf /tmp/runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz runseal
+
+          NONO_HASH=$(sha256sum /tmp/nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz | awk '{print $1}')
+          RUNSEAL_HASH=$(sha256sum /tmp/runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz | awk '{print $1}')
+          echo "$NONO_HASH  nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz" > /tmp/nono-SHA256SUMS
+          echo "$RUNSEAL_HASH  runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz" > /tmp/runseal-SHA256SUMS
+
+          cat > /tmp/fake-bins/curl << 'CURL_EOF'
+          #!/bin/sh
+          out=""
+          url=""
+          prev=""
+          for arg in "$@"; do
+            case "$prev" in
+              -o|--output) out="$arg" ;;
+            esac
+            case "$arg" in
+              https://github.com/always-further/*) url="$arg" ;;
+            esac
+            prev="$arg"
+          done
+
+          serve() {
+            if [ -n "$out" ]; then
+              cp "$1" "$out"
+            else
+              cat "$1"
+            fi
+            exit 0
+          }
+
+          case "$url" in
+            *nono*SHA256SUMS*)
+              serve /tmp/nono-SHA256SUMS ;;
+            *nono*.tar.gz*)
+              serve /tmp/nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz ;;
+            *runseal*SHA256SUMS*)
+              serve /tmp/runseal-SHA256SUMS ;;
+            *runseal*.tar.gz*)
+              serve /tmp/runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz ;;
+            "")
+              exec /usr/bin/curl "$@" ;;
+            *)
+              exec /usr/bin/curl "$@" ;;
+          esac
+          CURL_EOF
+          chmod +x /tmp/fake-bins/curl
+
+          echo "/tmp/fake-bins" >> "$GITHUB_PATH"
+
+      - name: Run command with custom policy
         id: action
-        continue-on-error: true
         uses: .
         with:
           run: echo "policy test passed"
           policy: |
+            fs:
+              read: ["."]
+              write: []
             network:
               mode: blocked
           verify-attestations: "false"
-      - name: Assert result
-        env:
-          ACTION_OUTCOME: ${{ steps.action.outcome }}
+
+      - name: Assert action completed successfully
         run: |
-          echo "Action outcome: $ACTION_OUTCOME"
-          if [ "$ACTION_OUTCOME" = "success" ]; then
-            echo "PASS: runseal action with inline policy completed successfully"
-          else
-            echo "SKIP: runseal action did not succeed (environment may lack required kernel features or network access)"
-            echo "This is expected when running in environments without Landlock support or restricted network"
-          fi
-          exit 0
+          echo "PASS: runseal ran with custom policy YAML"

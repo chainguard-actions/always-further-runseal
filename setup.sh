@@ -179,9 +179,9 @@ install_release_binary() {
     if [[ -x "${install_dir}/${name}" ]]; then
         echo "${name} v${version} already installed at ${install_dir}/${name}"
         verify_cached_binary "${name}" "${repo}" "${version}" "${target}" "${install_dir}" "${asset}"
-        safe_install_dir="$(printf '%s' "${install_dir}" | tr -d '\n\r')"
-        echo "${safe_install_dir}" >> "${GITHUB_PATH}"
-        export PATH="${safe_install_dir}:${PATH}"
+        printf '%s' "${install_dir}" | tr -d '\n\r' >> "${GITHUB_PATH}"
+        printf '\n' >> "${GITHUB_PATH}"
+        export PATH="${install_dir}:${PATH}"
         return
     fi
 
@@ -201,9 +201,9 @@ install_release_binary() {
         rm -f "${asset}" "${sums_asset}"
     )
     chmod +x "${install_dir}/${name}"
-    safe_install_dir="$(printf '%s' "${install_dir}" | tr -d '\n\r')"
-    echo "${safe_install_dir}" >> "${GITHUB_PATH}"
-    export PATH="${safe_install_dir}:${PATH}"
+    printf '%s' "${install_dir}" | tr -d '\n\r' >> "${GITHUB_PATH}"
+    printf '\n' >> "${GITHUB_PATH}"
+    export PATH="${install_dir}:${PATH}"
 }
 
 install_runseal_from_source() {
@@ -223,9 +223,9 @@ install_runseal_from_source() {
         cp target/release/runseal "${install_dir}/runseal"
     )
     chmod +x "${install_dir}/runseal"
-    safe_install_dir="$(printf '%s' "${install_dir}" | tr -d '\n\r')"
-    echo "${safe_install_dir}" >> "${GITHUB_PATH}"
-    export PATH="${safe_install_dir}:${PATH}"
+    printf '%s' "${install_dir}" | tr -d '\n\r' >> "${GITHUB_PATH}"
+    printf '\n' >> "${GITHUB_PATH}"
+    export PATH="${install_dir}:${PATH}"
 }
 
 TARGET="$(detect_target)"
