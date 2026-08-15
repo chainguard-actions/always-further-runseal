@@ -1,0 +1,112 @@
+name: Test filesystem write access
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up mock runseal and nono environment
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mock-bins
+
+          # Mock nono binary
+          cat > /tmp/mock-bins/nono << 'NONO_SCRIPT'
+          #!/bin/bash
+          case "${1:-}" in
+            --version) echo "nono 0.62.0"; exit 0 ;;
+            run)
+              shift
+              while [[ $# -gt 0 ]]; do
+                if [[ "$1" == "--" ]]; then shift; exec "$@"; fi
+                shift
+              done
+              ;;
+          esac
+          NONO_SCRIPT
+          chmod +x /tmp/mock-bins/nono
+
+          # Mock runseal binary
+          cat > /tmp/mock-bins/runseal << 'RUNSEAL_SCRIPT'
+          #!/bin/bash
+          case "${1:-}" in
+            --version) echo "runseal 0.3.1"; exit 0 ;;
+            run) exec bash -c "${RUNSEAL_RUN:-}" ;;
+          esac
+          RUNSEAL_SCRIPT
+          chmod +x /tmp/mock-bins/runseal
+
+          # Create tarballs
+          NONO_ASSET="nono-v0.62.0-x86_64-unknown-linux-gnu.tar.gz"
+          RUNSEAL_ASSET="runseal-v0.3.1-x86_64-unknown-linux-gnu.tar.gz"
+          tar -czf "/tmp/${NONO_ASSET}" -C /tmp/mock-bins nono
+          tar -czf "/tmp/${RUNSEAL_ASSET}" -C /tmp/mock-bins runseal
+
+          # Calculate SHA256 checksums
+          NONO_SHA=$(sha256sum "/tmp/${NONO_ASSET}" | awk '{print $1}')
+          RUNSEAL_SHA=$(sha256sum "/tmp/${RUNSEAL_ASSET}" | awk '{print $1}')
+
+          # Create SHA256SUMS files
+          echo "${NONO_SHA}  ${NONO_ASSET}" > /tmp/mock-nono-sha256sums
+          echo "${RUNSEAL_SHA}  ${RUNSEAL_ASSET}" > /tmp/mock-runseal-sha256sums
+
+          # Mock curl that serves local mock assets
+          cat > /tmp/mock-bins/curl << 'CURL_SCRIPT'
+          #!/bin/bash
+          URL=""
+          OUTPUT="/dev/stdout"
+          WRITE_OUT=""
+          i=1
+          while [[ $i -le $# ]]; do
+            arg="${!i}"
+            case "$arg" in
+              -o) i=$((i+1)); OUTPUT="${!i}" ;;
+              -w) i=$((i+1)); WRITE_OUT="${!i}" ;;
+              http*|https*) URL="$arg" ;;
+            esac
+            i=$((i+1))
+          done
+          case "$URL" in
+            *"nono-v"*".tar.gz")       cp /tmp/mock-nono.tar.gz "$OUTPUT" ;;
+            *"runseal-v"*".tar.gz")    cp /tmp/mock-runseal.tar.gz "$OUTPUT" ;;
+            *"/nono/"*"SHA256SUMS"*)   cp /tmp/mock-nono-sha256sums "$OUTPUT" ;;
+            *"/runseal/"*"SHA256SUMS"*) cp /tmp/mock-runseal-sha256sums "$OUTPUT" ;;
+          esac
+          [[ -n "$WRITE_OUT" ]] && echo "$URL"
+          exit 0
+          CURL_SCRIPT
+          chmod +x /tmp/mock-bins/curl
+
+          # Rename tarballs to the paths curl will copy from
+          cp "/tmp/${NONO_ASSET}" /tmp/mock-nono.tar.gz
+          cp "/tmp/${RUNSEAL_ASSET}" /tmp/mock-runseal.tar.gz
+
+          echo "/tmp/mock-bins" >> "$GITHUB_PATH"
+
+      - name: Pre-create output file so runseal can allow write access to it
+        run: touch /tmp/runseal-output.txt
+
+      - name: Run command with fs-write access
+        id: action
+        uses: .
+        with:
+          run: echo written-by-runseal > /tmp/runseal-output.txt
+          verify-attestations: "false"
+          fs-write: /tmp/runseal-output.txt
+          network: blocked
+
+      - name: Assert output file was written
+        run: |
+          if [ ! -f /tmp/runseal-output.txt ]; then
+            echo "FAIL: output file was not created"
+            exit 1
+          fi
+          CONTENT="$(cat /tmp/runseal-output.txt)"
+          echo "actual content: $CONTENT"
+          if [ "$CONTENT" != "written-by-runseal" ]; then
+            echo "FAIL: expected 'written-by-runseal', got '$CONTENT'"
+            exit 1
+          fi
+          echo "PASS"
