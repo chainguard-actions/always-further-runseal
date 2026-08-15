@@ -1,0 +1,50 @@
+name: GitHub Token Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-token:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: GitHub PAT is injected only for allowed API route
+        uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
+        env:
+          RUNSEAL_GITHUB_PAT: ${{ secrets.RUNSEAL_GITHUB_PAT }}
+        with:
+          run: |
+            set -euo pipefail
+            test -z "${RUNSEAL_GITHUB_PAT:-}"
+            test -n "${RUNSEAL_ACCESS_GITHUB_TOKEN:-}"
+            printf "raw github PAT stripped: yes\n"
+            printf "phantom credential present: yes len=%s prefix=%s\n" "${#RUNSEAL_ACCESS_GITHUB_TOKEN}" "${RUNSEAL_ACCESS_GITHUB_TOKEN:0:8}"
+            curl -fsS \
+              -H "Authorization: Bearer ${RUNSEAL_ACCESS_GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${GITHUB_BASE_URL}/user"
+            printf "github PAT injected ok\n"
+          runseal-version: source
+          audit: artifact
+          policy: |
+            fs:
+              read: ["."]
+              write: []
+            network:
+              mode: filtered
+            access:
+              github:
+                secret: RUNSEAL_GITHUB_PAT
+                url: https://api.github.com
+                allow:
+                  - GET /user

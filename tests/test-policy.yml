@@ -1,4 +1,4 @@
-name: Test basic usage - echo command
+name: Test policy YAML input
 on:
   workflow_dispatch:
 jobs:
@@ -30,16 +30,21 @@ jobs:
           echo "Fake nono installed at $NONO_DIR/nono"
           echo "Fake runseal installed at $RUNSEAL_DIR/runseal"
 
-      - name: Run echo command in sandbox
+      - name: Run command with explicit policy
         id: action
         uses: .
         with:
-          run: echo "hello from runseal"
-          network: blocked
+          run: echo "policy-based run"
+          policy: |
+            network:
+              mode: blocked
+            fs:
+              read: []
+              write: []
           runseal-version: "0.3.0"
           nono-version: "0.3.0"
           verify-attestations: "false"
 
       - name: Assert action completed successfully
         run: |
-          echo "PASS: action completed without error"
+          echo "PASS: policy test completed without error"

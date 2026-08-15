@@ -1,0 +1,50 @@
+name: Runseal Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Basic sandbox
+        uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
+        with:
+          run: printf "runseal smoke ok\n"
+          runseal-version: source
+          policy: |
+            fs:
+              read: ["."]
+              write: []
+            network:
+              mode: blocked
+
+      - name: Secret is not exposed to command
+        uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
+        env:
+          RUNSEAL_QA_API_TOKEN: ${{ secrets.RUNSEAL_QA_API_TOKEN }}
+        with:
+          run: |
+            test -z "$RUNSEAL_QA_API_TOKEN"
+            printf "secret stripped ok\n"
+          runseal-version: source
+          policy: |
+            fs:
+              read: ["."]
+              write: []
+            network:
+              mode: filtered
+            access:
+              api:
+                secret: RUNSEAL_QA_API_TOKEN
+                url: https://example.com
+                allow:
+                  - GET /**

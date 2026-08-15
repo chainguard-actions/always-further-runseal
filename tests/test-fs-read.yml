@@ -1,4 +1,4 @@
-name: Test basic usage - echo command
+name: Test filesystem read access
 on:
   workflow_dispatch:
 jobs:
@@ -30,11 +30,16 @@ jobs:
           echo "Fake nono installed at $NONO_DIR/nono"
           echo "Fake runseal installed at $RUNSEAL_DIR/runseal"
 
-      - name: Run echo command in sandbox
+      - name: Create a test file to read
+        run: |
+          echo "test-content-12345" > /tmp/test-read-file.txt
+
+      - name: Run command with fs-read permission
         id: action
         uses: .
         with:
-          run: echo "hello from runseal"
+          run: cat /tmp/test-read-file.txt
+          fs-read: "/tmp/test-read-file.txt"
           network: blocked
           runseal-version: "0.3.0"
           nono-version: "0.3.0"
@@ -42,4 +47,4 @@ jobs:
 
       - name: Assert action completed successfully
         run: |
-          echo "PASS: action completed without error"
+          echo "PASS: fs-read test completed without error"

@@ -3,12 +3,15 @@ name: Publish with Runseal
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: always-further/runseal@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
         with:
           run: npm publish
           policy: |

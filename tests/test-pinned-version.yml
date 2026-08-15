@@ -1,0 +1,38 @@
+name: Test pinned runseal version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Pre-install mock runseal and nono binaries
+        run: |
+          TARGET="x86_64-unknown-linux-gnu"
+          INSTALL_ROOT="${RUNNER_TOOL_CACHE:-/tmp}/runseal"
+          RUNSEAL_DIR="${INSTALL_ROOT}/runseal/0.3.0/${TARGET}"
+          NONO_DIR="${INSTALL_ROOT}/nono/0.3.0/${TARGET}"
+          mkdir -p "${RUNSEAL_DIR}" "${NONO_DIR}"
+
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'if [ "$1" = "--version" ]; then echo "nono 0.3.0"; exit 0; fi' \
+            'exec "$@"' > "${NONO_DIR}/nono"
+          chmod +x "${NONO_DIR}/nono"
+
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'if [ "$1" = "--version" ]; then echo "runseal 0.3.0"; exit 0; fi' \
+            'if [ "$1" = "run" ]; then exec bash -c "${RUNSEAL_RUN}"; fi' \
+            'exec "$@"' > "${RUNSEAL_DIR}/runseal"
+          chmod +x "${RUNSEAL_DIR}/runseal"
+      - name: Run command with pinned runseal version
+        id: action
+        uses: .
+        with:
+          run: echo "pinned-version-test"
+          runseal-version: "0.3.0"
+          nono-version: "0.3.0"
+          network: blocked
+          verify-attestations: "false"
+      - name: Assert action completed successfully
+        run: |
+          echo "PASS: pinned version action completed without error"

@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Fetch npm dependencies
-        uses: always-further/runseal@main
+        uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
         with:
           run: npm ci --ignore-scripts
           policy: |
@@ -30,7 +30,7 @@ jobs:
                 - registry.npmjs.org
 
       - name: Run required package scripts without network
-        uses: always-further/runseal@main
+        uses: always-further/runseal@c63685a6fa2e8fd662fe753e96af076f085dfce0 # main
         with:
           run: npm rebuild
           policy: |

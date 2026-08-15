@@ -1,4 +1,4 @@
-name: Test basic usage - echo command
+name: Test filesystem write access
 on:
   workflow_dispatch:
 jobs:
@@ -30,16 +30,31 @@ jobs:
           echo "Fake nono installed at $NONO_DIR/nono"
           echo "Fake runseal installed at $RUNSEAL_DIR/runseal"
 
-      - name: Run echo command in sandbox
+      - name: Prepare output directory
+        run: |
+          mkdir -p /tmp/runseal-write-test
+
+      - name: Run command with fs-write permission
         id: action
         uses: .
         with:
-          run: echo "hello from runseal"
+          run: echo "written-by-runseal" > /tmp/runseal-write-test/output.txt
+          fs-write: "/tmp/runseal-write-test"
           network: blocked
           runseal-version: "0.3.0"
           nono-version: "0.3.0"
           verify-attestations: "false"
 
-      - name: Assert action completed successfully
+      - name: Assert output file was written
         run: |
-          echo "PASS: action completed without error"
+          if [ ! -f /tmp/runseal-write-test/output.txt ]; then
+            echo "FAIL: output file was not created"
+            exit 1
+          fi
+          CONTENT="$(cat /tmp/runseal-write-test/output.txt)"
+          echo "content: $CONTENT"
+          if ! echo "$CONTENT" | grep -q "written-by-runseal"; then
+            echo "FAIL: expected 'written-by-runseal' in output file"
+            exit 1
+          fi
+          echo "PASS: fs-write test completed successfully"
