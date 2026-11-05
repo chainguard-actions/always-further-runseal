@@ -1,0 +1,27 @@
+name: Test repo profile input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare writable directory
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/profile-out"
+          mkdir -p "$GITHUB_WORKSPACE/profile-out"
+      - id: action
+        uses: .
+        with:
+          verify-attestations: "false"
+          profile: tests/fixtures/runseal-profile.json
+          run: echo profile-ok > "${{ github.workspace }}/profile-out/result.txt"
+      - name: Assert file written via profile permissions
+        run: |
+          ACTUAL="$(cat "$GITHUB_WORKSPACE/profile-out/result.txt" 2>/dev/null || true)"
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "profile-ok" ]; then
+            echo "FAIL: expected 'profile-ok'"
+            exit 1
+          fi
+          echo "PASS"

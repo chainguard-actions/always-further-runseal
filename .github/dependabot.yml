@@ -1,0 +1,33 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      rust-dependencies:
+        patterns:
+          - "*"
+
+  # The nono release binary this action installs.
+  - package-ecosystem: cargo
+    directory: /.github/nono-version
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "chore(nono)"
+    labels:
+      - dependencies
+      - nono
+    allow:
+      - dependency-name: nono-cli

@@ -1,0 +1,36 @@
+name: Test basic policy usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare writable directory
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/runseal-out"
+          mkdir -p "$GITHUB_WORKSPACE/runseal-out"
+      - id: action
+        uses: .
+        with:
+          verify-attestations: "false"
+          run: echo sealed-ok > runseal-out/result.txt
+          policy: |
+            fs:
+              read: ["."]
+              write: ["./runseal-out"]
+            network:
+              mode: blocked
+      - name: Assert tools installed and command ran
+        run: |
+          set -e
+          command -v runseal || { echo "FAIL: runseal not on PATH"; exit 1; }
+          command -v nono || { echo "FAIL: nono not on PATH"; exit 1; }
+          runseal --version
+          ACTUAL="$(cat "$GITHUB_WORKSPACE/runseal-out/result.txt" 2>/dev/null || true)"
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "sealed-ok" ]; then
+            echo "FAIL: expected 'sealed-ok' in runseal-out/result.txt"
+            exit 1
+          fi
+          echo "PASS"

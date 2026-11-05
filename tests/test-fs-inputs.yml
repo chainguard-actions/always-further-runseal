@@ -1,0 +1,30 @@
+name: Test fs-read/fs-write/network inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare writable directory
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/fs-out"
+          mkdir -p "$GITHUB_WORKSPACE/fs-out"
+      - id: action
+        uses: .
+        with:
+          verify-attestations: "false"
+          runseal-version: v0.3.4
+          fs-read: "."
+          fs-write: "./fs-out"
+          network: blocked
+          run: echo inputs-ok > fs-out/out.txt
+      - name: Assert file written
+        run: |
+          ACTUAL="$(cat "$GITHUB_WORKSPACE/fs-out/out.txt" 2>/dev/null || true)"
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "inputs-ok" ]; then
+            echo "FAIL: expected 'inputs-ok'"
+            exit 1
+          fi
+          echo "PASS"

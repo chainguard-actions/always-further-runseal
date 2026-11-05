@@ -1,0 +1,10 @@
+{
+  "meta": { "name": "runseal-act-profile-test" },
+  "filesystem": {
+    "read": ["."],
+    "write": ["./profile-out"]
+  },
+  "network": {
+    "block": true
+  }
+}
